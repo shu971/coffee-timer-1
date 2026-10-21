@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Café Clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-1: #f3e6d3;
+    --bg-2: #e6cfb1;
+    --ink: #4a3426;
+    --ink-soft: #8a6a52;
+    --line: rgba(74, 52, 38, 0.25);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg-1);
+    color: var(--ink);
+    font-family: "Jost", sans-serif;
+    overflow: hidden;
+  }
+
+  /* 壁紙：窓から差し込む午後の光のような柔らかいグラデーション */
+  .wall {
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 70% 60% at 22% 18%, rgba(255, 246, 230, 0.95), transparent 70%),
+      radial-gradient(ellipse 60% 70% at 85% 90%, rgba(201, 159, 118, 0.55), transparent 70%),
+      linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 60%, #d9b892 100%);
+  }
+  /* 紙のようなざらつき */
+  .grain {
+    position: fixed; inset: -50%;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity: 0.12;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+
+  .stage {
+    position: relative;
+    height: 100%;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: 6vh 6vw;
+  }
+
+  .top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  .center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5vw;
+  }
+  .clock { text-align: center; }
+
+  .label {
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: clamp(1.1rem, 1.8vw, 1.7rem);
+    color: var(--ink-soft);
+    margin-bottom: 1.5vh;
+  }
+
+  .time {
+    font-family: "Cormorant Garamond", serif;
+    font-weight: 300;
+    font-size: clamp(4.5rem, 14vw, 17rem);
+    line-height: 0.95;
+    letter-spacing: 0.02em;
+    font-variant-numeric: lining-nums tabular-nums;
+    white-space: nowrap;
+  }
+  .time .colon {
+    display: inline-block;
+    opacity: 0.45;
+    transform: translateY(-0.06em);
+    margin: 0 0.04em;
+  }
+  .time .sec {
+    font-size: 0.32em;
+    font-style: italic;
+    color: var(--ink-soft);
+    margin-left: 0.15em;
+    vertical-align: 0.15em;
+  }
+
+  .rule {
+    width: 4.5rem;
+    height: 1px;
+    background: var(--line);
+    margin: 4vh auto 3vh;
+  }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 2.6rem;
+  }
+  .controls button {
+    background: none;
+    border: none;
+    font-family: "Jost", sans-serif;
+    font-weight: 300;
+    font-size: 0.78rem;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    cursor: pointer;
+    padding: 0.3em 0 0.3em 0.4em;
+    position: relative;
+    transition: color 0.4s ease;
+  }
+  .controls button::after {
+    content: "";
+    position: absolute;
+    left: 0.4em; right: 0; bottom: -2px;
+    height: 1px;
+    background: var(--ink);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.5s ease;
+  }
+  .controls button:hover { color: var(--ink); }
+  .controls button:hover::after,
+  .controls button.active::after { transform: scaleX(1); }
+  .controls button.active { color: var(--ink); }
+
+  /* マグカップ */
+  .cup-wrap {
+    position: relative;
+    width: clamp(220px, 30vw, 560px);
+    flex-shrink: 0;
+  }
+  .cup {
+    display: block;
+    width: 100%;
+    overflow: visible;
+  }
+  /* ハート完成時のひとこと */
+  .done {
+    position: absolute;
+    left: 0; right: 0;
+    top: 100%;
+    margin-top: 0.4em;
+    text-align: center;
+    font-family: "Cormorant Garamond", serif;
+    font-weight: 300;
+    font-size: clamp(1.8rem, 3.2vw, 3.6rem);
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+    pointer-events: none;
+  }
+  .done.show { opacity: 1; transform: translateY(0); }
+  .steam path {
+    fill: none;
+    stroke: #fffaf2;
+    stroke-width: 5;
+    stroke-linecap: round;
+    opacity: 0;
+    filter: url(#soft);
+    animation: steam 6s ease-in-out infinite;
+  }
+  .steam path:nth-child(2) { animation-delay: 2s; }
+  .steam path:nth-child(3) { animation-delay: 4s; }
+  @keyframes steam {
+    0%   { opacity: 0;    transform: translateY(14px) scaleY(0.8); }
+    30%  { opacity: 0.55; }
+    100% { opacity: 0;    transform: translateY(-34px) scaleY(1.15); }
+  }
+  .steam { transition: opacity 3s ease; }
+
+  .bottom {
+    text-align: center;
+    font-family: "Cormorant Garamond", serif;
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--ink-soft);
+    opacity: 0.8;
+  }
+
+  @media (max-width: 800px) {
+    .center { flex-direction: column; gap: 3vh; }
+    .time { font-size: 22vw; }
+    .cup-wrap { width: 60vw; }
+  }
+</style>
+</head>
+<body>
+  <div class="wall"></div>
+  <div class="grain"></div>
+
+  <main class="stage">
+    <div class="top">
+      <span>Café&nbsp;Clock</span>
+      <span id="date"></span>
+    </div>
+
+    <div class="center">
+      <div class="clock">
+        <div class="label">tokyo, now</div>
+        <div class="time" id="time"></div>
+        <div class="rule"></div>
+        <div class="controls">
+          <button id="start">Start</button>
+          <button id="stop">Stop</button>
+          <button id="reset">Reset</button>
+        </div>
+      </div>
+
+      <div class="cup-wrap">
+      <div class="done" id="done">nice work today.</div>
+      <svg class="cup" viewBox="0 0 320 300" aria-hidden="true">
+        <defs>
+          <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.2"/>
+          </filter>
+          <filter id="foam" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="0.9"/>
+          </filter>
+          <!-- 陶器の陰影 -->
+          <linearGradient id="ceramic" x1="0" x2="1">
+            <stop offset="0"   stop-color="#e9dccb"/>
+            <stop offset="0.35" stop-color="#fbf6ee"/>
+            <stop offset="0.7" stop-color="#f1e6d7"/>
+            <stop offset="1"   stop-color="#d9c7b1"/>
+          </linearGradient>
+          <linearGradient id="inner" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#d8c6b0"/>
+            <stop offset="1" stop-color="#f3e9dc"/>
+          </linearGradient>
+          <radialGradient id="latte" cx="0.42" cy="0.4" r="0.7">
+            <stop offset="0"   stop-color="#c79a6e"/>
+            <stop offset="0.6" stop-color="#a9764d"/>
+            <stop offset="1"   stop-color="#7d5233"/>
+          </radialGradient>
+          <linearGradient id="saucer" x1="0" x2="1">
+            <stop offset="0" stop-color="#e4d5c2"/>
+            <stop offset="0.4" stop-color="#f7f0e6"/>
+            <stop offset="1" stop-color="#d6c3ab"/>
+          </linearGradient>
+          <clipPath id="opening">
+            <ellipse cx="150" cy="80" rx="84" ry="49"/>
+          </clipPath>
+        </defs>
+
+        <!-- 影 -->
+        <ellipse cx="160" cy="252" rx="140" ry="30" fill="#7d5233" opacity="0.12" filter="url(#soft)"/>
+        <!-- ソーサー -->
+        <ellipse cx="150" cy="236" rx="132" ry="38" fill="url(#saucer)"/>
+        <ellipse cx="150" cy="232" rx="88" ry="24" fill="#e8dac8" opacity="0.7"/>
+
+        <!-- 取っ手 -->
+        <path d="M234,98 C292,92 300,178 226,186" fill="none" stroke="#e4d6c4" stroke-width="18" stroke-linecap="round"/>
+        <path d="M234,98 C286,94 292,174 226,180" fill="none" stroke="#f6efe5" stroke-width="7" stroke-linecap="round" opacity="0.8"/>
+
+        <!-- 本体 -->
+        <path d="M58,80 C58,150 68,200 80,226 A70,22 0 0 0 220,226 C232,200 242,150 242,80 A92,55 0 0 0 58,80 Z" fill="url(#ceramic)"/>
+
+        <!-- 内側と中身（飲み口の形で切り抜く） -->
+        <g clip-path="url(#opening)">
+          <rect x="60" y="25" width="180" height="110" fill="url(#inner)"/>
+          <g id="liquid" opacity="0">
+            <ellipse id="surface" cx="150" cy="150" rx="70" ry="42" fill="url(#latte)"/>
+            <ellipse id="crema" cx="150" cy="150" rx="70" ry="42" fill="none" stroke="#d9b48c" stroke-width="2.5" opacity="0.6"/>
+            <g filter="url(#foam)">
+              <g id="art" opacity="0">
+                <ellipse cx="0" cy="0.02" rx="0.62" ry="0.56" fill="#e9d2b4" opacity="0.55"/>
+                <path d="M0,0.36 C-0.62,-0.02 -0.5,-0.62 0,-0.26 C0.5,-0.62 0.62,-0.02 0,0.36 Z" fill="#fbf3e6"/>
+              </g>
+            </g>
+          </g>
+        </g>
+
+        <!-- 飲み口のふち -->
+        <ellipse cx="150" cy="80" rx="88" ry="52" fill="none" stroke="#fdf9f3" stroke-width="7"/>
+        <ellipse cx="150" cy="80" rx="91.5" ry="54.5" fill="none" stroke="#d9c7b1" stroke-width="1" opacity="0.6"/>
+
+        <!-- 湯気 -->
+        <g class="steam" id="steam" opacity="0">
+          <path d="M125,40 C112,22 138,8 124,-14 C114,-30 132,-42 126,-56"/>
+          <path d="M152,36 C140,16 166,4 152,-20 C142,-36 160,-48 154,-62"/>
+          <path d="M178,40 C166,22 190,10 178,-12 C170,-28 186,-40 180,-54"/>
+        </g>
+      </svg>
+      </div>
+    </div>
+
+    <div class="bottom">your own pace is the right pace.</div>
+  </main>
+
+<script>
+  const SPEED = 2;                       // 時計の倍率
+  const FILL_MS = 60 * 60 * 1000;        // 実時間60分で満タン
+  const JST = 9 * 60 * 60 * 1000;        // UTC+9
+
+  // 確認用：URLに ?fast=100 を付けるとラテの溜まり方だけ100倍速になる（時計は常に正しい速さ）
+  const FAST = Number(new URLSearchParams(location.search).get("fast")) || 1;
+  const realNow = () => Date.now();
+
+  // mode: "live"（普通の日本時間） / "running"（倍速中） / "paused"（停止中）
+  let mode = "live";
+  let baseTime = 0;    // 倍速スタート時点の表示時刻
+  let startReal = 0;   // スタートを押した実時刻
+  let pouredMs = 0;    // これまでに注いだ実時間（停止中も保持）
+  let artStart = null; // ハートの演出を始めた時刻
+  let artFade = 1;     // ハートの濃さ（再スタートで消す用）
+
+  const $ = id => document.getElementById(id);
+  const $time = $("time"), $date = $("date");
+  const $liquid = $("liquid"), $surface = $("surface"), $crema = $("crema");
+  const $art = $("art"), $steam = $("steam"), $done = $("done");
+
+  function shownTime() {
+    if (mode === "live") return realNow();
+    if (mode === "running") return baseTime + (realNow() - startReal) * SPEED;
+    return baseTime;
+  }
+  function pouredNow() {
+    return mode === "running" ? pouredMs + (realNow() - startReal) * FAST : pouredMs;
+  }
+
+  const pad = n => String(n).padStart(2, "0");
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const ease = t => 1 - Math.pow(1 - t, 3);
+
+  function render(ts) {
+    // 時計
+    const d = new Date(shownTime() + JST);
+    $time.innerHTML =
+      pad(d.getUTCHours()) + '<span class="colon">:</span>' + pad(d.getUTCMinutes()) +
+      '<span class="sec">' + pad(d.getUTCSeconds()) + '</span>';
+    $date.textContent = MONTHS[d.getUTCMonth()] + " " + d.getUTCDate() + ", " + d.getUTCFullYear();
+
+    // ラテの量（0〜1）
+    const f = Math.min(pouredNow() / FILL_MS, 1);
+    const wob = Math.sin(ts / 1400) * 0.6;           // 水面のかすかな揺れ
+    const cy = 150 - f * 64;
+    const rx = 70 + f * 13 + wob;
+    const ry = 42 + f * 7 + wob * 0.3;
+    for (const el of [$surface, $crema]) {
+      el.setAttribute("cy", cy); el.setAttribute("rx", rx); el.setAttribute("ry", ry);
+    }
+    $liquid.setAttribute("opacity", f > 0 ? 1 : 0);
+    $steam.style.opacity = f > 0.03 ? 1 : 0;
+
+    // ハート
+    let a = 0, s = 0.35, complete = false;
+    if (artStart !== null) {
+      const t = Math.min((ts - artStart) / 2600, 1);
+      a = ease(t) * artFade;
+      s = 0.35 + 0.65 * ease(t);
+      complete = t >= 1 && mode === "paused";
+    }
+    $done.classList.toggle("show", complete);
+    if (mode === "running" && artFade > 0) artFade = Math.max(0, artFade - 0.03);
+    if (artFade === 0) artStart = null;
+    $art.setAttribute("opacity", a);
+    $art.setAttribute("transform",
+      `translate(150 ${cy}) scale(${rx * 1.2 * s} ${ry * 1.2 * s})`);
+
+    requestAnimationFrame(render);
+  }
+
+  function setMode(m) {
+    mode = m;
+    $("start").classList.toggle("active", m === "running");
+    $("stop").classList.toggle("active", m === "paused");
+  }
+
+  $("start").onclick = () => {
+    if (mode === "running") return;
+    baseTime = shownTime();
+    startReal = realNow();
+    setMode("running");
+  };
+  $("stop").onclick = () => {
+    if (mode !== "running") return;
+    baseTime = shownTime();
+    pouredMs = pouredNow();
+    setMode("paused");
+    artFade = 1;
+    artStart = performance.now();
+  };
+  $("reset").onclick = () => {
+    pouredMs = 0;
+    artStart = null;
+    setMode("live");
+  };
+
+  setMode("live");
+  requestAnimationFrame(render);
+</script>
+</body>
+</html>
